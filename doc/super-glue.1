@@ -1,0 +1,54 @@
+." super-glue manual page
+." Copyright 2021 Mitchell Levy
+." 
+." This file is a part of super-glue
+." 
+." super-glue is free software: you can redistribute it and/or modify
+." it under the terms of the GNU Affero General Public License as published by
+." the Free Software Foundation, either version 3 of the License, or
+." (at your option) any later version.
+." 
+." super-glue is distributed in the hope that it will be useful,
+." but WITHOUT ANY WARRANTY; without even the implied warranty of
+." MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+." GNU Affero General Public License for more details.
+." 
+." You should have received a copy of the GNU Affero General Public License
+." along with super-glue.  If not, see <https://www.gnu.org/licenses/>.
+
+.TH SUPER-GLUE 1
+.SH NAME
+super-glue \- an HTTP server to glue together apps and the web
+.SH SYNOPSIS
+\fBsuper-glue\fR [\fB-i\fR] \fIfile\fR ...\fR
+.br
+\fBsuper-glue\fR \fB-v\fR
+.SH DESCRIPTION
+.B super-glue
+is designed to provide a simple way of connecting apps together and to the web via HTTP.
+This is done using a series of simple configuration files, specified on the command-line when
+.B super-glue
+is run in the
+.I file
+part of the command.
+These configuration files also specify whether
+.B super-glue
+should attempt to start these processes itself, or look for already running instances.
+.PP
+.B super-glue
+can be run in interactive mode through the use of the \fB-i\fR option.
+This allows a user to issue commands to a running
+.B super-glue
+instance directly.
+By default,
+.B super-glue
+runs in a daemon form, where it writes logging information to \fBSTDOUT\fR, suitable for processing in a production environment.
+.SH OPTIONS
+.TP
+\fB -i, --interactive \fR
+Run in interactive mode, allowing the user to provide commands directly.
+This also limits the amount of logging produced to enhance usability.
+.TP
+\fB-v, --version \fR
+Print version information and exit.
+This option cannot be combined with other options.
