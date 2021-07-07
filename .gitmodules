@@ -1,4 +1,4 @@
 [submodule "vendor/cmocka"]
-	path = vendor/cmocka
-	url = https://gitlab.com/cmocka/cmocka.git
+  path = vendor/cmocka
+  url = https://gitlab.com/cmocka/cmocka.git
   ignore = dirty
