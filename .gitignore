@@ -1,0 +1,18 @@
+# Exclude all contents of the build directory
+/build
+
+# Exclude symlinks that are rebuilt by `make test`
+/test/*.so*
+/test/include
+
+# Exclude binaries
+/super-glue
+
+# Exclude compile-commands, as these can be generated from the Makefile
+compile_commands.json
+
+# Exclude clangd caches
+/.cache/
+
+# Exclude user-specific GDB files
+.gdb*
