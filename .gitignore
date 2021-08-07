@@ -1,10 +1,6 @@
 # Exclude all contents of the build directory
 /build
 
-# Exclude symlinks that are rebuilt by `make test`
-/test/*.so*
-/test/include
-
 # Exclude binaries
 /super-glue
 
@@ -16,3 +12,6 @@ compile_commands.json
 
 # Exclude user-specific GDB files
 .gdb*
+
+# Exclude vim swp files
+.*.swp
