@@ -39,6 +39,7 @@ int alloc_sprintf(char **dest, const char *fmt, ...) {
   if (*dest == NULL) return -1;
   int res = vsnprintf(*dest, bytes_needed, fmt, args);
   if (res < 0) {
+    free(dest);
     *dest = NULL;
     return -1;
   }
