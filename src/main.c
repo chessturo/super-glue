@@ -30,8 +30,6 @@ along with super-glue.  If not, see <https://www.gnu.org/licenses/>.
 static void usage(const char *prog_name);
 
 int main(int argc, char *argv[]) {
-  printf("Hello world\n");
-
   // Process our command line arguments.
   State *state;
   ConfigFiles *files;
@@ -39,14 +37,29 @@ int main(int argc, char *argv[]) {
   ArgsResult res = process_args(argc, argv, &state, &files, &error);
 
   // Do any needed error handling based on the parsing of our arguments.
-  if (res != ARGS_OK) {
+  if (res != ARGS_OK && res != ARGS_NO_FILES && res != ARGS_NONE) {
     fprintf(stderr, "Error: %s\n", error);
-    if (res == ARGS_NONE || res == ARGS_NO_FILES) {
-      usage(argv[0]);
-    }
     free_state(state);
     free_config_files(files);
     return EXIT_FAILURE;
+  } else if (res == ARGS_NONE) {
+    usage(argv[0]);
+    free_state(state);
+    free_config_files(files);
+    return EXIT_FAILURE;
+  } else if (res == ARGS_NO_FILES) {
+    if (state->version_info_requested) {
+      printf("super-glue version %s\n", VERSION);
+      printf("Copyright 2021 Mitchell Levy\n");
+      printf("super-glue is free software, licensed under the AGPLv3.\n");
+      printf("You should have received a copy of the GNU Affero General Public License "
+          "along with super-glue.  If not, see <https://www.gnu.org/licenses/>.\n");
+    } else {
+      usage(argv[0]);
+      free_state(state);
+      free_config_files(files);
+      return EXIT_FAILURE;
+    }
   }
   
   free_state(state);
@@ -56,6 +69,6 @@ int main(int argc, char *argv[]) {
 
 static void usage(const char *prog_name) {
   fprintf(stderr, "Usage: \n");
-  fprintf(stderr, "\t%s [-i] files ...\n", prog_name);
+  fprintf(stderr, "\t%s [-i] [-p port_num] files ...\n", prog_name);
 }
 
