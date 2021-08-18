@@ -13,7 +13,8 @@ to send chat messages from a browser.
 party HTTP server. This would consume JVM resources and potentially slow down
 the game server. This is also non-flexible; if you wanted players to also be
 able to send messages on discord and have them picked up by a bot and sent to
-the  server, you'd have to rewrite your plugin.
+the  server, you'd have to rewrite your plugin or maintain the overhead of
+running an HTTP server in the same JVM as the game server.
 - Using `super-glue`, this process is simple. The Java app reads from a UNIX 
 pipe, and `super-glue` processes incoming HTTP POST requests, and writes the 
 chat messages to the pipe. This works equally well for a discord bot; whenever
