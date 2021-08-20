@@ -21,6 +21,7 @@ along with super-glue.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "process_args.h"
 
+#include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -47,13 +48,15 @@ typedef struct {
   OptInfoType type;
   OptInfoData data;
 } OptInfo;
-const OptInfo EMPTY_OPT_INFO = {NONE};
 
-// Keeps track of which args require which data
+// Keeps track of which args are available and their properties
 typedef enum {
   OPT_INTERACTIVE = 0,
   OPT_VERSION,
+  OPT_PORT,
 } OptId;
+// This integer must have at least as many bits as there are possible options.
+typedef uint8_t OptsApplied_t;
 typedef enum {
   NOT_UNIQ = 0,
   UNIQ,
@@ -83,15 +86,16 @@ typedef enum {
 static Option valid_options[] = {
     {OPT_INTERACTIVE, 'i', "interactive", NONE, UNIQ},
     {OPT_VERSION, 'v', "version", NONE, UNIQ},
+    {OPT_PORT, 'p', "port", INT, UNIQ},
 };
 
 // Processes a single option (where an option is of the form "-oinfo" [note that
 // this form is only valid if -o takes extra info, otherwise it is parsed as "-o
 // -i -n -f -o"] "-o info" [again, only valid if -o takes extra info, otherwise
-// "info" is treated as the end of options/as a file], "--option=info", or
-// "--option info"). The long form of the option supports abbreviation of the
-// option name when unambiguous. Caller assumes ownership of the `error` string,
-// which must be passed to `free`.
+// "info" is treated as the end of options/as a file], "-o=info",
+// "--option=info", or "--option info"). The long form of the option supports
+// abbreviation of the option name when unambiguous. Caller assumes ownership of
+// the `error` string, which must be passed to `free`.
 //
 // option_strs_len - The length of the `option strs` array.
 // option_strs     - All of the options that were given on the command line.
@@ -135,6 +139,8 @@ static Option valid_options[] = {
 // - OPT_INVALID_USE: User error; the user gave info when disallowed (e.g.,
 //   "--version=3") or ommitted/gave the wrong type when necessary.
 // - OPT_UNKNOWN: User error; the user gave an unknown option.
+// - OPT_AMBIGUOUS: User error; the user shortened a long-form option in an
+//   ambiguous way.
 static ProcessOptionResult process_option(int option_strs_len,
     char *option_strs[], int idx, char **error, int *next_idx,
     int *options_count, Option ***options, OptInfo **info);
@@ -188,14 +194,20 @@ static ParseInfoResult parse_info_str(const char *info_str, OptInfoType type,
 // Given a string like "abcinfo" where 'c' is the short name of an option that
 // takes extra info, this function will return `3`, representing options 'a',
 // 'b', and 'c'.
-static int count_combined_options(const char *opt_str);
+//
+// On success, returns the number of options as described above with *error
+// set to NULL.
+//
+// One error, returns a negative value and sets *error to a string indicating
+// the error. This new string is dynamically allocated; it is the caller's
+// responsibility to pass it to `free`.
+static int count_combined_options(const char *opt_str, char **error);
 
 // Frees an `OptInfo` struct allocated by `process_option`
 //
 // ptr - A pointer to the struct to free.
 static void free_opt_info(OptInfo *ptr);
 
-typedef uint8_t OptsApplied_t;
 ArgsResult process_args(int argc, char *argv[], State **state,
     ConfigFiles **files, char **error) {
   // Initialize `*files`  and `*state` to NULL. This way if the call returns
@@ -251,6 +263,8 @@ ArgsResult process_args(int argc, char *argv[], State **state,
     if (res != OPT_OK) {
       // None of the cases set `*error` because it should've been set in the
       // call to `process_option`.
+      free(options);
+      free_opt_info(info);
       switch (res) {
         // Silence -Wswitch, if this branch has taken there's been some serious
         // memory corruption.
@@ -267,6 +281,8 @@ ArgsResult process_args(int argc, char *argv[], State **state,
       }
     }
 
+    free(*error);
+
     for (int i = 0; i < options_count; i++) {
       // Use `applied_options` to keep track of which options we've already
       // seen.
@@ -275,6 +291,7 @@ ArgsResult process_args(int argc, char *argv[], State **state,
       if (current_option->unique && applied_options & shifted_val) {
         alloc_sprintf(error, "Option --%s can only be applied once.",
             current_option->long_name);
+        free(options);
         return ARGS_CONFLICT;
       }
       applied_options |= shifted_val;
@@ -284,30 +301,45 @@ ArgsResult process_args(int argc, char *argv[], State **state,
       switch (current_option->id) {
         case OPT_VERSION:
           (*state)->version_info_requested = true;
-          if (applied_options != shifted_val) {
-            alloc_sprintf(error, "--%s cannot be combined with other options.",
-                current_option->long_name);
-            return ARGS_CONFLICT;
-          }
           break;
         case OPT_INTERACTIVE:
           (*state)->interactive = true;
-          if (applied_options & 1 << OPT_VERSION) {
-            alloc_sprintf(error, "--%s cannot be combined with other options.",
-                get_opt_by_id(OPT_VERSION)->long_name);
-            return ARGS_CONFLICT;
+          break;
+        case OPT_PORT:
+          if (info->data.numeric < 0 || info->data.numeric > UINT16_MAX) {
+            alloc_sprintf(error, "--%s can only take values between 0 and %d",
+                current_option->long_name, UINT16_MAX);
+            free_opt_info(info);
+            free(options);
+            return ARGS_INVALID_USE;
           }
+          (*state)->port = htons(info->data.numeric);
           break;
       }
+    }
+
+    // Handle the special case where `--version` cannot be applied with other
+    // options.
+    OptsApplied_t shifted_version = 1 << OPT_VERSION;
+    if (applied_options & shifted_version &&
+        applied_options != shifted_version) {
+      alloc_sprintf(error, "--%s cannot be combined with other options.",
+          get_opt_by_id(OPT_VERSION)->long_name);
+      free(options);
+      return ARGS_CONFLICT;
     }
 
     free_opt_info(info);
     free(options);
   }
 
-  // All tokens provieded on the command line were options, no files.
   if (current_arg == argc) {
+    // All tokens provieded on the command line were options, no files.
     return ARGS_NO_FILES;
+  } else if ((*state)->version_info_requested) {
+    // Checks if --version was supplied with files. Since this makes no sense,
+    // report an error.
+    return ARGS_INVALID_USE;
   }
 
   if (!alloc_config_files(argc - current_arg, &(argv[current_arg]), files,
@@ -331,6 +363,8 @@ static ProcessOptionResult process_option(int option_strs_len,
   const char *current_option = option_strs[idx];
   const char *info_str;
   Option *last_option;
+  *error = NULL;
+
   // Check if this is a long-form option or a short-form option
   if (*(current_option + 1) == '-') {
     // This is a long-form option, so we don't have to worry about having
@@ -369,6 +403,7 @@ static ProcessOptionResult process_option(int option_strs_len,
       SET_OUTPUT_PARAMS_ERROR;
       alloc_sprintf(error, "Unknown option: --%s", option_name);
       free(option_name);
+      free(matches);
       return OPT_UNKNOWN;
     } else if (matches_len > 1) {
       SET_OUTPUT_PARAMS_ERROR;
@@ -403,6 +438,7 @@ static ProcessOptionResult process_option(int option_strs_len,
       *error = malloc(error_buf_size);
       if (*error == NULL) {
         free(option_name);
+        free(matches);
         return OPT_AMBIGUOUS;
       }
       // Set the first char to be '\0' so that it's treated as starting as a
@@ -415,6 +451,7 @@ static ProcessOptionResult process_option(int option_strs_len,
       char *tmp_buf = malloc(max_possibility_size);
       if (tmp_buf == NULL) {
         free(option_name);
+        free(matches);
         return OPT_AMBIGUOUS;
       }
       snprintf(tmp_buf, max_possibility_size, fmt_base, matches[0]->long_name);
@@ -427,75 +464,72 @@ static ProcessOptionResult process_option(int option_strs_len,
 
       free(tmp_buf);
       free(option_name);
+      free(matches);
       return OPT_AMBIGUOUS;
     }
     free(option_name);
 
-    last_option = matches[0];
+    // We unambiguously know which option the user intended, so we can set the
+    // output parameters accordingly. `next_idx` can't be set yet because we
+    // might have to consume the next element of `option_strs` as option info.
     *options_count = 1;
+    *options = malloc(sizeof(Option *) * *options_count);
+    (*options)[0] = matches[0];
+    last_option = (*options)[0];
     free(matches);
+
+    if (*options == NULL) {
+      SET_OUTPUT_PARAMS_ERROR;
+      *error = strdup(strerror(ENOMEM));
+      return OPT_MEM;
+    }
+
     // If there's an equals sign, we know for sure that the user is intending to
     // pass extra info
     if (equals_location != NULL) {
-      // If this argument doesn't take extra info, then that's an error, if it
-      // does, then we're done.
+      // If this argument doesn't take extra info, then that's an error
       if (last_option->info_type == NONE) {
+        alloc_sprintf(error, "Option --%s does not take an option-argument.",
+            last_option->long_name);
+        free(*options);
         SET_OUTPUT_PARAMS_ERROR;
         return OPT_INVALID_USE;
       }
+
       *next_idx = idx + 1;
-      *options = malloc(sizeof(Option *) * *options_count);
-      if (*options == NULL) {
-        SET_OUTPUT_PARAMS_ERROR;
-        return OPT_MEM;
-      }
-      *info = malloc(sizeof(OptInfo *));
-      if (*info == NULL) {
-        SET_OUTPUT_PARAMS_ERROR;
-        return OPT_MEM;
-      }
-      (*info)->type = last_option->info_type;
-      (*options)[0] = last_option;
-
       info_str = equals_location + 1;
-    } else {
-      if (last_option->info_type == NONE) {
-        // This is an early exit, and the branch we end up at when processing
-        // a long option that doesn't take extra info that's used properly.
-        *info = NULL;
-        *options = malloc(sizeof(Option *) * *options_count);
-        if (*options == NULL) {
-          SET_OUTPUT_PARAMS_ERROR;
-          return OPT_MEM;
-        }
-        *(options[0]) = last_option;
-        *next_idx = idx + 1;
-
-        return OPT_OK;
-      }
+    } else if (last_option->info_type != NONE) {
       // If this option does take extra info, then parse the next option as
       // an info, regardless of its actual contents.
       if (idx + 1 == option_strs_len) {
-        SET_OUTPUT_PARAMS_ERROR;
-        alloc_sprintf(error, "No option argument provided to --%s, which "
+        alloc_sprintf(error, "No option-argument provided to --%s, which "
             "requires one.", last_option->long_name);
+        free(*options);
+        SET_OUTPUT_PARAMS_ERROR;
         return OPT_INVALID_USE;
       }
+
       *next_idx = idx + 2;
       info_str = option_strs[idx + 1];
+    } else {
+      // No equals sign, not expecting info, so just consume `idx` and move on
+      // by returning, no need to try and parse `info_str`
+      *next_idx = idx + 1;
+      *info = NULL;
+      return OPT_OK;
     }
-
   } else {
     // Set up all of our convenience variables, as well as some of our output
     // parameters
-    *options_count = count_combined_options(current_option + 1);
-    if (sizeof(Option *) * (*options_count) > PTRDIFF_MAX) {
-      alloc_sprintf(error, "Too many options provided");
-      return OPT_MEM;
+    *options_count = count_combined_options(current_option + 1, error);
+    if (*options_count < 0) {
+      SET_OUTPUT_PARAMS_ERROR;
+      return OPT_UNKNOWN;
     }
     char *opt_str = malloc((*options_count + 1) * sizeof(char));
     strncpy(opt_str, current_option + 1, *options_count);
     opt_str[*options_count] = '\0';
+
     *options = malloc(sizeof(Option *) * (*options_count));
 
     for (int i = 0; i < *options_count; i++) {
@@ -505,17 +539,24 @@ static ProcessOptionResult process_option(int option_strs_len,
 
     // Check if the last option is one that's supposed to take extra info. If
     // not, then we're done! Otherwise, parse the extra info into an output
-    // parameter.
+    // parameter. Check for an `=` to check for user error (e.g., "-o=abc" when
+    // option "o" doesn't take extra info)
     last_option = (*options)[*options_count - 1];
     if (last_option->info_type == NONE) {
+      if (strchr(current_option, '=') != NULL) {
+        alloc_sprintf(error, "Option -%c does not require an option-argument",
+            last_option->short_name);
+        free(*options);
+        SET_OUTPUT_PARAMS_ERROR;
+        return OPT_INVALID_USE;
+      }
       *info = NULL;
       *next_idx = idx + 1;
       return OPT_OK;
     } else {
-      // Check if the last character of `current_option` is a terminator. We
-      // need the `+ 2` to account for the '-'. This acts as a check for if
-      // we're dealing with "-o info" or "-oinfo".
-      if (current_option[*options_count + 2] == '\0') {
+      // Check if the last character of `current_option` is a terminator. This
+      // acts as a check for if we're dealing with "-o info" or "-oinfo".
+      if (current_option[*options_count + 1] == '\0') {
         // We need to consume the next value in `option_strs` after `idx` as our
         // info for this option.
         if (idx + 1 == option_strs_len) {
@@ -523,14 +564,22 @@ static ProcessOptionResult process_option(int option_strs_len,
           // did not provide info to an option that needed it.
           alloc_sprintf(error, "Option -%c requires an option-argument",
               (*options)[*options_count - 1]->short_name);
+          free(*options);
+          SET_OUTPUT_PARAMS_ERROR;
           return OPT_INVALID_USE;
         }
+        // We're consuming the next entry in `option_strs`, so we want to skip
+        // over the `80` in `-p 80` when we move on to the next option
         *next_idx = idx + 2;
         info_str = option_strs[idx + 1];
       } else {
         // `info_str` should just be a pointer to the first non-option character
-        // in `current_option`. `+ 2` is to account for the '-'.
-        info_str = current_option + *options_count + 2;
+        // in `current_option`.
+        info_str = current_option + *options_count + 1;
+        if (*info_str == '=') info_str++;  // Skip an equals sign if its given.
+        // Our info string is in `option_strs[idx]` so we want the next option
+        // processed to be `option_strs[idx + 1]`
+        *next_idx = idx + 1;
       }
     }
   }
@@ -538,6 +587,8 @@ static ProcessOptionResult process_option(int option_strs_len,
   ParseInfoResult res = parse_info_str(info_str, last_option->info_type,
       info);
   if (res != INFO_OK) {
+    free(*options);
+    free(*info);
     SET_OUTPUT_PARAMS_ERROR;
     if (res == INFO_MEM) {
       *error = strdup(strerror(ENOMEM));
@@ -625,21 +676,18 @@ static ParseInfoResult parse_info_str(const char *info_str, OptInfoType type,
       // guidelines, the only way to read the string properly is with
       // `sscanf`
       (*info)->data.numeric = 0;
-      int sscanf_result =
-          sscanf(info_str, "%"SCNd32, &((*info)->data.numeric));
-      if (sscanf_result == EOF) {
-        if (errno == ERANGE) {
+      int sscanf_result = sscanf(info_str, "%"SCNd32, &((*info)->data.numeric));
+      if (sscanf_result == EOF || sscanf_result == 0) {
+        if (sscanf_result == EOF && errno == ERANGE) {
           return INFO_RANGE;
         } else {
           return INFO_NOT_INT;
         }
       }
       // This acts as a check for garbage characters at the end of the
-      // info string that get ignored by `sscanf`. The `+ 1` is to account
-      // for the fact that `snprintf` includes the '\0' while `strlen`
-      // does not.
+      // info string that get ignored by `sscanf`.
       if ((size_t)snprintf(NULL, 0, "%"PRId32, (*info)->data.numeric) !=
-          strlen(info_str) + 1) {
+          strlen(info_str)) {
         return INFO_NOT_INT;
       }
       return INFO_OK;
@@ -656,11 +704,14 @@ static ParseInfoResult parse_info_str(const char *info_str, OptInfoType type,
   abort();
 }
 
-static int count_combined_options(const char *opt_str) {
+static int count_combined_options(const char *opt_str, char **error) {
   int index = 0;
-  while (opt_str[index] != '\0') {
+  while (opt_str[index] != '\0' && opt_str[index] != '=') {
     Option *current_opt = get_opt_by_short_name(opt_str[index]);
-    if (current_opt == NULL) return -1;
+    if (current_opt == NULL) {
+      alloc_sprintf(error, "Unknown short option -%c", opt_str[index]);
+      return -1;
+    }
     if (current_opt->info_type != NONE) return index + 1;
     index++;
   }
@@ -674,3 +725,4 @@ static void free_opt_info(OptInfo *ptr) {
   }
   free(ptr);
 }
+

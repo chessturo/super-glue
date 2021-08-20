@@ -147,11 +147,15 @@ LDLIBS.test ::= -lcheck -lm -lrt -lsubunit
 
 # -----------------------------------------------------------------------------
 # Phony targets
-.PHONY: test testclean
+.PHONY: test testclean test-mem
 test: $(TEST_EXE)
 	@./$(TEST_EXE)
 test-mem: $(TEST_EXE)
 	$(info Testing under valgrind...)
+ifneq ($(BUILD),debug)
+	$(warning WARNING: Without BUILD being set to debug, valgrind won\'t be able \
+    to report line numbers inside the super-glue shared object!)
+endif
 	@CK_FORK=no valgrind --leak-check=full --show-leak-kinds=all ./$(TEST_EXE)
 testclean:
 	rm -rf $(TEST_BUILD_DIR) $(TEST_EXE)
@@ -171,6 +175,8 @@ $(TEST_OBJ_DIR)/%.o: $(TEST_SRC_DIR)/%.c | $(TEST_DEP_DIR)/%.d $(TEST_OBJ_DIR) $
 # -----------------------------------------------------------------------------
 # Build final object files
 $(TEST_EXE): $(TEST_OBJS) $(TEST_SUPER_GLUE_SO) | $(TEST_BUILD_DIR)
+	@# FIXME rebuilding with different BUILD back to back can result in the wrong
+	@# shared object being linked to
 	@ln -frs $(TEST_SUPER_GLUE_SO) $(TEST_SUPER_GLUE_SO_LN)
 	$(CC) $(CFLAGS.test) $(RPATH_CURRENT_DIR) -L./$(TEST_BUILD_DIR) -o $@ $(filter-out $(TEST_SUPER_GLUE_SO),$^) $(LDLIBS.test) -lsuper-glue
 $(TEST_SUPER_GLUE_SO): $(SUPER_GLUE_PIC_OBJS)

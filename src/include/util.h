@@ -20,7 +20,11 @@ along with super-glue.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef SUPER_GLUE_INCLUDE_UTIL_H_
 #define SUPER_GLUE_INCLUDE_UTIL_H_
 
-#include <stddef.h>
+#include <stdint.h>
+
+// A typedef for a IP port. *Anything stored in a variable of this type should
+// be in network byte order.*
+typedef uint16_t Port_t;
 
 // Allocates a buffer large enough to hold the string produced by calling
 // `snprintf` with the given `fmt` and `...`. This function uses a default

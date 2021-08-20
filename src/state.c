@@ -17,7 +17,6 @@ You should have received a copy of the GNU Affero General Public License
 along with super-glue.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "util.h"
 #define _XOPEN_SOURCE 500
 
 #include "state.h"
@@ -28,6 +27,8 @@ along with super-glue.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 
+#include "util.h"
+
 bool alloc_state(State **state) {
   *state = malloc(sizeof(State));
   if (*state == NULL) {
@@ -37,6 +38,7 @@ bool alloc_state(State **state) {
   // Initialize to be a default `State`
   (*state)->interactive = false;
   (*state)->version_info_requested = false;
+  (*state)->port = 80;
 
   return true;
 }

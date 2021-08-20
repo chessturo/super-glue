@@ -22,12 +22,16 @@ along with super-glue.  If not, see <https://www.gnu.org/licenses/>.
 #define SUPER_GLUE_INCLUDE_STATE_H_ 
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
+
+#include "util.h"
 
 // Specifies the global state of the current execution of super-glue.
 typedef struct {
   bool interactive;
   bool version_info_requested;
+  Port_t port;
 } State;
 
 // Holds references to the configuration files that are currently in use.
