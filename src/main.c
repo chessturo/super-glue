@@ -29,6 +29,12 @@ along with super-glue.  If not, see <https://www.gnu.org/licenses/>.
 // Prints usage information to stderr.
 static void usage(const char *prog_name);
 
+#define FREE_AT_EXIT \
+  do { \
+    free_state(state); \
+    free_config_files(files); \
+    free(error); \
+  } while(0);
 int main(int argc, char *argv[]) {
   // Process our command line arguments.
   State *state;
@@ -39,13 +45,11 @@ int main(int argc, char *argv[]) {
   // Do any needed error handling based on the parsing of our arguments.
   if (res != ARGS_OK && res != ARGS_NO_FILES && res != ARGS_NONE) {
     fprintf(stderr, "Error: %s\n", error);
-    free_state(state);
-    free_config_files(files);
+    FREE_AT_EXIT;
     return EXIT_FAILURE;
   } else if (res == ARGS_NONE) {
     usage(argv[0]);
-    free_state(state);
-    free_config_files(files);
+    FREE_AT_EXIT;
     return EXIT_FAILURE;
   } else if (res == ARGS_NO_FILES) {
     if (state->version_info_requested) {
@@ -56,14 +60,12 @@ int main(int argc, char *argv[]) {
           "along with super-glue.  If not, see <https://www.gnu.org/licenses/>.\n");
     } else {
       usage(argv[0]);
-      free_state(state);
-      free_config_files(files);
+      FREE_AT_EXIT;
       return EXIT_FAILURE;
     }
   }
   
-  free_state(state);
-  free_config_files(files);
+  FREE_AT_EXIT;
   return EXIT_SUCCESS;
 }
 
