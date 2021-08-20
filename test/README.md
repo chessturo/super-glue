@@ -4,15 +4,16 @@ This document follows the Semantic Line Breaks standard.
 -->
 
 # Testing `super-glue`
-The goal of this document is to help contributors develop tests for `super-glue`.
-This is done by
-giving an overview of the relevant build systems,
-a description of how the test driver expects tests to be set up,
-and a brief overview of the `cmocka` testing framework used by `super-glue`.
+`super-glue` uses the `libcheck` testing framework.
+This means that in order to build tests,
+you must have `libcheck` installed.
+Instructions for installing `libcheck` can be found on their
+[website](https://libcheck.github.io/check/web/install.html).
 
-This is not a comprehensive guide to `cmocka`;
-for a full description, see the [api docs](https://api.cmocka.org/).
+Tests can be built and run using `make`;
+the command to build and run all tests is `make test`.
+Additionally, tests can be run under `valgrind` using `make`.
+This target provides some options to make the output more friendly;
+it can be run using `make test-mem BUILD=debug`.
+You will recieve a warning if you omit the `BUILD=debug`.
 
-## Mock Objects
-
-## Writing Tests
