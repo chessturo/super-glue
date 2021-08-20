@@ -74,8 +74,9 @@ void free_state(State *state);
 bool alloc_config_files(int file_count, char *file_names[], ConfigFiles **files,
     char **error);
 
-// Frees a pointer to an allocated `ConfigFiles` struct. Do not attempt to free
-// any members of the struct before passing it to this function.
+// Frees a pointer to an allocated `ConfigFiles` struct and closes its `FILE*`s.
+// Do not attempt to free/close any members of the struct before passing it to
+// this function.
 //
 // files - A pointer to a `ConfigFiles` struct allocated using
 //         `alloc_config_files`. Do not attempt to use this pointer after this
