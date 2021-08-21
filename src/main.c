@@ -58,6 +58,8 @@ int main(int argc, char *argv[]) {
       printf("super-glue is free software, licensed under the AGPLv3.\n");
       printf("You should have received a copy of the GNU Affero General Public License "
           "along with super-glue.  If not, see <https://www.gnu.org/licenses/>.\n");
+      FREE_AT_EXIT;
+      return EXIT_SUCCESS;
     } else {
       usage(argv[0]);
       FREE_AT_EXIT;
