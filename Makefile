@@ -43,7 +43,8 @@ BUILD_DIR ::= build
 OBJ_DIR ::= $(BUILD_DIR)/obj/$(BUILD)
 DEP_DIR ::= $(BUILD_DIR)/dep
 SRC_DIR ::= src
-SRCS ::= $(wildcard $(SRC_DIR)/*.c)
+LIB_DIR ::= lib
+SRCS ::= $(wildcard $(SRC_DIR)/*.c) $(wildcard $(LIB_DIR)/*.c)
 OBJS ::= $(foreach SRC,$(SRCS),$(OBJ_DIR)/$(notdir $(SRC:.c=.o)))
 DEPS ::= $(foreach SRC,$(SRCS),$(DEP_DIR)/$(notdir $(SRC:.c=.d)))
 
@@ -58,7 +59,7 @@ LD ::= ld
 # Flags
 
 # Set flags for $(CC), based on the value of $(BUILD)
-CFLAGS.base ::= -Wall -Wextra -pthread -std=c17 -I./src/include
+CFLAGS.base ::= -Wall -Wextra -pthread -std=c17 -I./$(SRC_DIR)/include -I./$(LIB_DIR)/include
 CFLAGS.debug ::= -g
 CFLAGS.release ::= -O3
 CFLAGS ::= $(CFLAGS.$(BUILD)) $(CFLAGS.base)
@@ -94,7 +95,8 @@ $(DEPS):
 # Targets that build intermediates
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(DEP_DIR)/%.d $(OBJ_DIR) $(DEP_DIR)
 	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
-
+$(OBJ_DIR)/%.o: $(LIB_DIR)/%.c | $(DEP_DIR)/%.d $(OBJ_DIR) $(DEP_DIR)
+	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
 # =============================================================================
 # Build test executables
 
@@ -168,6 +170,8 @@ $(TEST_OBJ_DIR)/$(TEST_DRIVER_NAME).o: $(TEST_DRIVER_SRC) | $(TEST_DEP_DIR)/$(TE
 	$(CC) $(DEPFLAGS.test) $(CFLAGS.test) -c -o $@ $<
 
 $(SUPER_GLUE_PIC_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(DEP_DIR)/%.d $(SUPER_GLUE_PIC_OBJ_DIR) $(DEP_DIR)
+	$(CC) $(DEPFLAGS) $(CFLAGS.test) -fpic -c -o $@ $<
+$(SUPER_GLUE_PIC_OBJ_DIR)/%.o: $(LIB_DIR)/%.c | $(DEP_DIR)/%.d $(SUPER_GLUE_PIC_OBJ_DIR) $(DEP_DIR)
 	$(CC) $(DEPFLAGS) $(CFLAGS.test) -fpic -c -o $@ $<
 $(TEST_OBJ_DIR)/%.o: $(TEST_SRC_DIR)/%.c | $(TEST_DEP_DIR)/%.d $(TEST_OBJ_DIR) $(TEST_DEP_DIR)
 	$(CC) $(DEPFLAGS.test) $(CFLAGS.test) -c -o $@ $<
