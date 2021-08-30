@@ -21,6 +21,7 @@ along with super-glue.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <check.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include "linked_list.h"
 
@@ -79,6 +80,24 @@ START_TEST(allocate) {
       "NULL");
   LinkedList_free(ll, NULL);
 } END_TEST
+
+#define malloc_size 64
+START_TEST(free_payload) {
+  ll = LinkedList_allocate();
+  ck_assert_msg(ll != NULL, "Allocating a new LinkedList shouldn't return "
+      "NULL");
+
+  char *a = malloc(malloc_size);
+  LinkedList_append(ll, a);
+  char *b = malloc(malloc_size);
+  LinkedList_append(ll, b);
+  char *c = malloc(malloc_size);
+  LinkedList_append(ll, c);
+
+  // Valgrind will detect if a, b, or c aren't freed.
+  LinkedList_free(ll, &free);
+} END_TEST
+#undef malloc_size
 
 // Bougs input test cases
 static void bogus_input_setup() {
@@ -167,13 +186,14 @@ START_TEST(iterator_get_null) {
 } END_TEST
 
 START_TEST(iterator_get_invalid) {
-  LinkedList *empty = ll;
-  LLIterator *invalid = LLIterator_allocate(empty);
+  LLIterator *invalid = LLIterator_allocate(ll);
 
   ck_assert_msg(!LLIterator_is_valid(invalid), "An iterator for an empty list "
       "should be invalid");
   ck_assert_msg(LLIterator_get(invalid) == NULL, "Getting an element from an "
       "invalid interator should return NULL");
+
+  LLIterator_free(invalid);
 } END_TEST
 
 START_TEST(iterator_remove_from_null) {
@@ -189,8 +209,7 @@ START_TEST(iterator_remove_from_null) {
 START_TEST(iterator_remove_from_invalid) {
   LLPayload out_ref = (LLPayload)0xDEADBEEF;
   LLPayload out = out_ref;
-  LinkedList *empty = ll;
-  LLIterator *invalid = LLIterator_allocate(empty);
+  LLIterator *invalid = LLIterator_allocate(ll);
 
   ck_assert_msg(!LLIterator_is_valid(invalid), "An iterator for an empty list "
       "should be invalid");
@@ -198,6 +217,8 @@ START_TEST(iterator_remove_from_invalid) {
       "an invalid iterator should return false");
   ck_assert_msg(out == out_ref, "Removing an element from an invalid iterator "
       "should not modify the output parameter");
+  
+  LLIterator_free(invalid);
 } END_TEST
 
 START_TEST(iterator_next_null) {
@@ -271,6 +292,8 @@ START_TEST(prepend) {
 
   ck_assert(LinkedList_num_elements(ll) == 3);
   ck_assert(LinkedList_eq(ll, ll_cmp));
+
+  LinkedList_free(ll_cmp, NULL);
 } END_TEST
 
 START_TEST(append_empty) {
@@ -296,6 +319,8 @@ START_TEST(append) {
 
   ck_assert(LinkedList_num_elements(ll) == 3);
   ck_assert(LinkedList_eq(ll, ll_cmp));
+
+  LinkedList_free(ll_cmp, NULL);
 } END_TEST
 
 START_TEST(pop_head_len_one) {
@@ -321,6 +346,8 @@ START_TEST(pop_head) {
   ck_assert(LinkedList_pop_head(ll, &out));
   ck_assert(LinkedList_num_elements(ll) == 2);
   ck_assert(LinkedList_eq(ll, ll_cmp));
+
+  LinkedList_free(ll_cmp, NULL);
 } END_TEST
 
 START_TEST(pop_tail_len_one) {
@@ -346,6 +373,8 @@ START_TEST(pop_tail) {
   ck_assert(LinkedList_pop_tail(ll, &out));
   ck_assert(LinkedList_num_elements(ll) == 2);
   ck_assert(LinkedList_eq(ll, ll_cmp));
+
+  LinkedList_free(ll_cmp, NULL);
 } END_TEST
 
 // Iterator test cases
@@ -462,6 +491,7 @@ Suite *linked_list_tests() {
   TCase *tc_core = tcase_create("core");
   tcase_add_checked_fixture(tc_core, &core_setup, &core_teardown);
   tcase_add_test(tc_core, allocate);
+  tcase_add_test(tc_core, free_payload);
   suite_add_tcase(s, tc_core);
 
   TCase *tc_bogus = tcase_create("bogus input");
