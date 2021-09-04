@@ -161,8 +161,6 @@ endif
 	@CK_FORK=no valgrind --leak-check=full --show-leak-kinds=all ./$(TEST_EXE)
 testclean:
 	rm -rf $(TEST_BUILD_DIR) $(TEST_EXE)
-echo:
-	$(info $(TEST_BUILD_DIR))
 
 # -----------------------------------------------------------------------------
 # Build intermediaries
