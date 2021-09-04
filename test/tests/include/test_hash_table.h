@@ -1,4 +1,4 @@
-/* Provides an entry point and code for running tests
+/* Declares the tests for `hash_table.c`
    Copyright 2021 Mitchell Levy
 
 This file is a part of super-glue
@@ -16,27 +16,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with super-glue.  If not, see <https://www.gnu.org/licenses/>.
 */
+
 #include <check.h>
-#include <stdio.h>
-#include <stdlib.h>
 
-#include "test_hash_table.h"
-#include "test_linked_list.h"
-#include "test_process_args.h"
-
-int main(int argc, char *argv[]) {
-  if (argc != 1) {
-    (void)argv;
-    fprintf(stderr, "Command-line options are ignored for tests.");
-  }
-
-  SRunner *runner = srunner_create(hash_table_tests());
-  srunner_add_suite(runner, linked_list_tests());
-  srunner_add_suite(runner, process_args_tests());
-  srunner_run_all(runner, CK_NORMAL);
-
-  int failed = srunner_ntests_failed(runner);
-  srunner_free(runner);
-
-  return failed == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
-}
+Suite *hash_table_tests();
