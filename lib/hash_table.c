@@ -78,6 +78,8 @@ static bool advance_to_target(LLIterator *iter, Hash64 hash, unsigned char *key,
 static bool advance_to_target(LLIterator *iter, Hash64 hash);
 #endif
 // Gets true key length (helper if user passes key_len = 0 => strlen(key))
+static inline size_t get_true_key_len(unsigned char *key, size_t key_len);
+
 static inline size_t get_true_key_len(unsigned char *key, size_t key_len) {
   size_t true_key_len;
   if (key_len == 0) {
