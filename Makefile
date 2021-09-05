@@ -35,6 +35,18 @@ else
   endif
 endif
 
+ifndef NOCOLOR
+	green ::= $(shell echo "\033[0;92m")
+	green ::= $(strip $(green))
+	red ::= $(shell echo "\033[0;32m")
+	red ::= $(strip $(red))
+	reset ::= $(shell echo "\033[0m")
+	reset ::= $(strip $(reset))
+else
+	red ::=
+	reset ::=
+endif
+
 # -----------------------------------------------------------------------------
 # Common variables
 
@@ -80,7 +92,8 @@ clean: testclean
 # -----------------------------------------------------------------------------
 # Targets that build executables
 super-glue: $(OBJS) 
-	$(CC) $(CFLAGS) -o $@ $^
+	@$(CC) $(CFLAGS) -o $@ $^
+	$(info Linking $(green)$@$(reset) due to $?)
 
 # -----------------------------------------------------------------------------
 # Help `make` deal properly with generated dependencies
@@ -94,9 +107,11 @@ $(DEPS):
 %.o: %.c
 # Targets that build intermediates
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(DEP_DIR)/%.d $(OBJ_DIR) $(DEP_DIR)
-	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
+	@$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
+	$(info Building $(green)$@$(reset) due to $?)
 $(OBJ_DIR)/%.o: $(LIB_DIR)/%.c | $(DEP_DIR)/%.d $(OBJ_DIR) $(DEP_DIR)
-	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
+	@$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
+	$(info Building $(green)$@$(reset) due to $?)
 # =============================================================================
 # Build test executables
 
@@ -155,8 +170,8 @@ test: $(TEST_EXE)
 test-mem: $(TEST_EXE)
 	$(info Testing under valgrind...)
 ifneq ($(BUILD),debug)
-	$(warning WARNING: Without BUILD being set to debug, valgrind won\'t be able \
-    to report line numbers inside the super-glue shared object!)
+	$(warning $(red)WARNING: Without BUILD being set to debug, valgrind won\'t be able \
+    to report line numbers inside the super-glue shared object!$(reset))
 endif
 	@CK_FORK=no valgrind --leak-check=full --show-leak-kinds=all ./$(TEST_EXE)
 testclean:
@@ -165,14 +180,18 @@ testclean:
 # -----------------------------------------------------------------------------
 # Build intermediaries
 $(TEST_OBJ_DIR)/$(TEST_DRIVER_NAME).o: $(TEST_DRIVER_SRC) | $(TEST_DEP_DIR)/$(TEST_DRIVER_NAME).d $(TEST_OBJ_DIR) $(TEST_DEP_DIR)
-	$(CC) $(DEPFLAGS.test) $(CFLAGS.test) -c -o $@ $<
+	@$(CC) $(DEPFLAGS.test) $(CFLAGS.test) -c -o $@ $<
+	$(info Building $(green)$@$(reset) due to $?)
 
 $(SUPER_GLUE_PIC_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(DEP_DIR)/%.d $(SUPER_GLUE_PIC_OBJ_DIR) $(DEP_DIR)
-	$(CC) $(DEPFLAGS) $(CFLAGS.test) -fpic -c -o $@ $<
+	@$(CC) $(DEPFLAGS) $(CFLAGS.test) -fpic -c -o $@ $<
+	$(info Building $(green)$@$(reset) due to $?)
 $(SUPER_GLUE_PIC_OBJ_DIR)/%.o: $(LIB_DIR)/%.c | $(DEP_DIR)/%.d $(SUPER_GLUE_PIC_OBJ_DIR) $(DEP_DIR)
-	$(CC) $(DEPFLAGS) $(CFLAGS.test) -fpic -c -o $@ $<
+	@$(CC) $(DEPFLAGS) $(CFLAGS.test) -fpic -c -o $@ $<
+	$(info Building $(green)$@$(reset) due to $?)
 $(TEST_OBJ_DIR)/%.o: $(TEST_SRC_DIR)/%.c | $(TEST_DEP_DIR)/%.d $(TEST_OBJ_DIR) $(TEST_DEP_DIR)
-	$(CC) $(DEPFLAGS.test) $(CFLAGS.test) -c -o $@ $<
+	@$(CC) $(DEPFLAGS.test) $(CFLAGS.test) -c -o $@ $<
+	$(info Building $(green)$@$(reset) due to $?)
 
 # -----------------------------------------------------------------------------
 # Build final object files
@@ -180,9 +199,12 @@ $(TEST_EXE): $(TEST_OBJS) $(TEST_SUPER_GLUE_SO) | $(TEST_BUILD_DIR)
 	@# FIXME rebuilding with different BUILD back to back can result in the wrong
 	@# shared object being linked to
 	@ln -frs $(TEST_SUPER_GLUE_SO) $(TEST_SUPER_GLUE_SO_LN)
-	$(CC) $(CFLAGS.test) $(RPATH_CURRENT_DIR) -L./$(TEST_BUILD_DIR) -o $@ $(filter-out $(TEST_SUPER_GLUE_SO),$^) $(LDLIBS.test) -lsuper-glue
+	$(info Creating symlink $(green)$(TEST_SUPER_GLUE_SO_LN) -> $(TEST_SUPER_GLUE_SO)$(reset))
+	@$(CC) $(CFLAGS.test) $(RPATH_CURRENT_DIR) -L./$(TEST_BUILD_DIR) -o $@ $(filter-out $(TEST_SUPER_GLUE_SO),$^) $(LDLIBS.test) -lsuper-glue
+	$(info Linking $(green)$@$(reset) due to $?)
 $(TEST_SUPER_GLUE_SO): $(SUPER_GLUE_PIC_OBJS)
-	$(CC) $(CFLAGS.test) -shared -o $@ $^ $(LDLIBS.test)
+	@$(CC) $(CFLAGS.test) -shared -o $@ $^ $(LDLIBS.test)
+	$(info Building $(green)$@$(reset) due to $?)
 
 # -----------------------------------------------------------------------------
 # Handle dependencies
