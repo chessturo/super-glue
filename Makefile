@@ -38,7 +38,7 @@ endif
 ifndef NOCOLOR
 	green ::= $(shell echo "\033[0;92m")
 	green ::= $(strip $(green))
-	red ::= $(shell echo "\033[0;32m")
+	red ::= $(shell echo "\033[0;31m")
 	red ::= $(strip $(red))
 	reset ::= $(shell echo "\033[0m")
 	reset ::= $(strip $(reset))
