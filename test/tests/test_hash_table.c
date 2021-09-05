@@ -265,6 +265,7 @@ START_TEST(remove) {
   HTValue old_value;
   ck_assert(HashTable_remove(ht, (unsigned char *)one, 0, &old_value));
   ck_assert(strcmp(old_value, un) == 0);
+  free(un);
 } END_TEST
 
 START_TEST(key_length) {
@@ -318,7 +319,7 @@ START_TEST(iterator_remove) {
   memset(times_seen, 0, sizeof(times_seen));
 
   while (HTIterator_is_valid(hti)) {
-    const uint8_t *key_ptr;
+    uint8_t *key_ptr;
     size_t key_size;
     HTValue value;
     
@@ -326,6 +327,7 @@ START_TEST(iterator_remove) {
           &value));
     ck_assert((intptr_t)value == (intptr_t) ~(*key_ptr));
     times_seen[*key_ptr]++;
+    free(key_ptr);
   }
 
   for (uint8_t key = 0; key < max_key; key++) {

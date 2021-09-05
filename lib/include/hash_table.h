@@ -101,6 +101,7 @@ HTValue *HashTable_find(HashTable *ht, unsigned char *key, size_t key_len);
 // old_value - An output parameter; if an entry with a matching key is found in
 //             the table, the removed value is passed through this parameter.
 //             This allows for the value to be appropriately freed if needed.
+//             Ignored if NULL.
 // 
 // Returns true if a value was found and removed, false if an element with a
 // matching key wasn't found. If this function returns false, *old_value isn't
@@ -160,7 +161,8 @@ bool HTIterator_get(HTIterator *hti, const unsigned char **key_out,
 // responsibility for the associated memory.
 //
 // hti         - The iterator to query.
-// key_out     - An output parameter set to the key. Ignored if NULL.
+// key_out     - An output parameter set to the key. This buffer must be freed
+//               by the caller. Ignored if NULL.
 // key_len_out - An output parameter set to the length of the key. Ignored if
 //               NULL.
 // value_out   - An output parameter set to the entry's value. Ignored if NULL.

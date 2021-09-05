@@ -222,6 +222,7 @@ bool HashTable_insert(HashTable *ht, unsigned char *key, size_t key_len,
     free(old_entry->key);
     free(old_entry);
   }
+  LLIterator_free(bucket_iter);
 
   LinkedList_prepend(bucket, new_entry);
   if (!found) ht->num_elems++;
@@ -243,9 +244,10 @@ HTValue *HashTable_find(HashTable *ht, unsigned char *key, size_t key_len) {
 #else
   bool found = advance_to_target(bucket_iter, hash);
 #endif 
-  if (!found) return NULL;
-  HTEntry *entry = *LLIterator_get(bucket_iter);
-  return &entry->value;
+
+  HTEntry **entry_ptr = (HTEntry **)LLIterator_get(bucket_iter);
+  LLIterator_free(bucket_iter);
+  return found ? &(*entry_ptr)->value : NULL;
 }
 
 // FIXME way to deal with LLIterator_allocate failure
@@ -263,15 +265,19 @@ bool HashTable_remove(HashTable *ht, unsigned char *key, size_t key_len,
 #else
   bool found = advance_to_target(bucket_iter, hash);
 #endif 
-  if (!found) return false;
 
-  HTEntry *old_entry;
-  LLIterator_remove(bucket_iter, (LLPayload *)&old_entry);
-  *old_value = old_entry->value;
-  free(old_entry);
+  if (found) {
+    HTEntry *old_entry;
 
-  ht->num_elems--;
-  return true;
+    LLIterator_remove(bucket_iter, (LLPayload *)&old_entry);
+    if (old_value != NULL) *old_value = old_entry->value;
+
+    free(old_entry->key);
+    free(old_entry);
+    ht->num_elems--;
+  }
+  LLIterator_free(bucket_iter);
+  return found;
 }
 
 HTIterator *HTIterator_allocate(HashTable *ht) {
@@ -279,6 +285,7 @@ HTIterator *HTIterator_allocate(HashTable *ht) {
   HTIterator *iter = malloc(sizeof(HTIterator));
   if (ht->num_elems == 0) {
     // If the hash table is empty, just return an invalid iterator.
+    iter->table = ht;
     iter->bucket_iter = NULL;
     return iter;
   }
@@ -348,12 +355,16 @@ bool HTIterator_remove(HTIterator *hti, unsigned char **key_out,
   }
 
   HTIterator_next(hti);
+  
+  // HashTable remove frees the key in the HTEntry struct, so the pointer
+  // into that struct we got from HTIterator_get is no longer valid. Therefore,
+  // we make a copy before returning it to the caller
+  unsigned char *key_cpy = malloc(key_len);
+  memcpy(key_cpy, key, key_len);
 
-  if (key_out != NULL) *key_out = key;
+  if (key_out != NULL) *key_out = key_cpy;
   if (key_len_out != NULL) *key_len_out = key_len;
-  HTValue ignored;
-  HashTable_remove(hti->table, key, key_len,
-      value_out != NULL ? value_out : &ignored);
+  HashTable_remove(hti->table, key, key_len, value_out);
   return true;
 }
 
