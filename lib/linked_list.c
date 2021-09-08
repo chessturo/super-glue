@@ -161,6 +161,7 @@ void LLIterator_free(LLIterator *lli) {
 }
 
 bool LLIterator_is_valid(LLIterator *lli) {
+  if (lli == NULL) return false;
   return lli->current != NULL;
 }
 
